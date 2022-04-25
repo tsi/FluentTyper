@@ -2,7 +2,7 @@
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
   typeof define === 'function' && define.amd ? define(factory) :
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Tribute = factory());
-}(this, (function () { 'use strict';
+})(this, (function () { 'use strict';
 
   /*eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }]*/
   class TributeEvents {
@@ -12,7 +12,7 @@
     }
 
     static keys() {
-      return ["Tab", "Enter", "Escape", "ArrowUp", "ArrowDown"];
+      return ["Tab", "Enter", "Escape", "ArrowUp", "ArrowDown", "Backspace"];
     }
 
     static modifiers() {
@@ -27,14 +27,14 @@
       const KEY_EVENT_TIMEOUT_MS = 32;
       element.boundKeyDown = this.tribute.debounce(this.keydown.bind(element, this), KEY_EVENT_TIMEOUT_MS);
       element.boundKeyUpInput = this.tribute.debounce(this.input.bind(element, this), KEY_EVENT_TIMEOUT_MS);
-      element.addEventListener("keydown", element.boundKeyDown, true);
-      element.addEventListener("keyup", element.boundKeyUpInput, true);
+      element.addEventListener("keydown", element.boundKeyDown, true); // element.addEventListener("keyup", element.boundKeyUpInput, true);
+
       element.addEventListener("input", element.boundKeyUpInput, true);
     }
 
     unbind(element) {
-      element.removeEventListener("keydown", element.boundKeyDown, true);
-      element.removeEventListener("keyup", element.boundKeyUpInput, true);
+      element.removeEventListener("keydown", element.boundKeyDown, true); // element.removeEventListener("keyup", element.boundKeyUpInput, true);
+
       element.removeEventListener("input", element.boundKeyUpInput, true);
       delete element.boundKeyDown;
       delete element.boundKeyUpInput;
@@ -53,9 +53,10 @@
         });
       }
 
-      if (instance.tribute.isActive && !controlKeyPressed) {
+      if (!controlKeyPressed) {
         TributeEvents.keys().forEach(key => {
-          if (key === event.code) {
+          if (key === event.code && ( // Special handling of Backspace
+          instance.tribute.isActive || event.code == "Backspace")) {
             instance.callbacks()[key](event, this);
             keyProcessed = true;
             return;
@@ -63,13 +64,26 @@
         });
       }
 
-      if (!keyProcessed) instance.tribute.hideMenu();
+      if (!keyProcessed) {
+        instance.tribute.lastReplacement = null;
+        instance.tribute.hideMenu();
+      }
     }
 
     input(instance, event) {
-      if (!(event instanceof CustomEvent)) {
-        instance.keyup.call(this, instance, event);
+      const cEvent = event instanceof CustomEvent;
+      const iEvent = event instanceof InputEvent;
+      const iEventHandle = iEvent && (event.inputType == "insertText" || event.inputType == "insertCompositionText" || event.inputType.startsWith("deleteContent"));
+
+      if (cEvent) {
+        return;
       }
+
+      if (iEvent && !iEventHandle) {
+        return;
+      }
+
+      instance.keyup.call(this, instance, event);
     }
 
     click(instance, event) {
@@ -153,8 +167,18 @@
 
       if (keyCode) {
         return keyCode;
-      } else {
-        if (this.tribute.current.mentionTriggerChar) return this.tribute.current.mentionTriggerChar.charCodeAt(0);else if (this.tribute.current.mentionText) return this.tribute.current.mentionText.charCodeAt(this.tribute.current.mentionText.length - 1);
+      }
+
+      if (event instanceof InputEvent && event.data) {
+        return event.data.charCodeAt(event.data.length - 1);
+      }
+
+      if (this.tribute.current.mentionTriggerChar) {
+        return this.tribute.current.mentionTriggerChar.charCodeAt(0);
+      }
+
+      if (this.tribute.current.mentionText) {
+        return this.tribute.current.mentionText.charCodeAt(this.tribute.current.mentionText.length - 1);
       }
 
       return NaN;
@@ -178,6 +202,24 @@
 
     callbacks() {
       return {
+        Backspace: (e, _el) => {
+          if (this.tribute.lastReplacement) {
+            if (this.tribute.events.updateSelection(_el) && this.tribute.current.mentionPosition == this.tribute.lastReplacement.mentionPosition + this.tribute.lastReplacement.content.length) {
+              e.preventDefault();
+              e.stopImmediatePropagation();
+              const addSpace = this.tribute.lastReplacement.content !== this.tribute.lastReplacement.content.trimEnd();
+              this.tribute.current = { ...this.tribute.lastReplacement
+              };
+              this.tribute.current.mentionText = this.tribute.lastReplacement.content;
+              this.tribute.replaceText(this.tribute.lastReplacement.mentionText + (addSpace ? " " : ""), e, null);
+            }
+
+            this.tribute.lastReplacement = null;
+            this.tribute.current = {};
+          }
+
+          this.tribute.hideMenu();
+        },
         Enter: (e, _el) => {
           // choose selection
           if (this.tribute.isActive && this.tribute.current.filteredItems) {
@@ -571,7 +613,7 @@
           const workingNodeContent = selectedElem.textContent;
           const selectStartOffset = sel.getRangeAt(0).startOffset;
           const lastChar = workingNodeContent[Math.max(0, selectStartOffset - 1)];
-          const addWhiteSpace = lastChar && lastChar !== lastChar.trim();
+          let addWhiteSpace = lastChar && lastChar !== lastChar.trim();
           effectiveRange = sel.toString().trim();
           nextChar = workingNodeContent.length > selectStartOffset ? workingNodeContent[selectStartOffset] : "";
 
@@ -585,6 +627,7 @@
             }
           }
 
+          addWhiteSpace = addWhiteSpace && effectiveRange === effectiveRange.trimEnd();
           effectiveRange += addWhiteSpace ? " " : "";
           this.restoreSelection(sel, range, direction);
         }
@@ -1070,12 +1113,14 @@
       menuItemLimit = undefined,
       menuShowMinLength = 0,
       keys = null,
-      numberOfWordsInContextText = 5
+      numberOfWordsInContextText = 5,
+      supportRevert = false
     }) {
       this.autocompleteMode = autocompleteMode;
       this.autocompleteSeparator = autocompleteSeparator;
       this.menuSelected = 0;
       this.current = {};
+      this.lastReplacement = null;
       this.isActive = false;
       this.activationPending = false;
       this.menuContainer = menuContainer;
@@ -1084,6 +1129,7 @@
       this.positionMenu = positionMenu;
       this.spaceSelectsMatch = spaceSelectsMatch;
       this.numberOfWordsInContextText = numberOfWordsInContextText;
+      this.supportRevert = supportRevert;
 
       if (keys) {
         TributeEvents.keys = keys;
@@ -1324,7 +1370,7 @@
         if (forceReplace) {
           // Do force replace - don't show menu
           this.current.mentionPosition -= forceReplace.length;
-          this.current.mentionText = " ".repeat(forceReplace.length) + this.current.mentionText;
+          this.current.mentionText = this.current.fullText.slice(-forceReplace.length);
           this.replaceText(forceReplace.text, null, null);
           return;
         }
@@ -1484,6 +1530,12 @@
     }
 
     replaceText(content, originalEvent, item) {
+      if (this.supportRevert) {
+        this.lastReplacement = { ...this.current
+        };
+        this.lastReplacement.content = content;
+      }
+
       this.range.replaceTriggerText(content, originalEvent, item);
     }
 
@@ -1580,4 +1632,4 @@
 
   return Tribute;
 
-})));
+}));

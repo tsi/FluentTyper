@@ -73,8 +73,8 @@ const manifest = {
       name: "fallbackLanguage",
       type: "popupButton",
       options: [
-        ["none", "None"],
         ["en", "English"],
+        ["none", "None"],
       ],
       label: "Fallback prediction language:",
       default: "en",
@@ -101,6 +101,15 @@ const manifest = {
       display: true,
       label: "Number of suggestions (Set to 0 to disable prediction):",
       default: 5,
+    },
+    {
+      tab: i18n.get("settings"),
+      group: i18n.get("General"),
+      name: "autocomplete",
+      type: "checkbox",
+      label:
+        "Auto-completes word on 'space' (Returns to original text on 'backspace').",
+      default: true,
     },
     {
       tab: i18n.get("settings"),
@@ -160,15 +169,15 @@ const manifest = {
       text: testFluentTyperHTML,
     },
     {
-      tab: "Domain list",
+      tab: "Domain blocklist",
       group: i18n.get("Management"),
-      name: "domainList",
+      name: "domainBlackList",
       type: "listBox",
       options: (function () {})(),
       default: [],
     },
     {
-      tab: "Domain list",
+      tab: "Domain blocklist",
       group: i18n.get("Management"),
       name: "removeDomainBtn",
       type: "button",

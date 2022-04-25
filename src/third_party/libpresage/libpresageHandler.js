@@ -1,6 +1,6 @@
 import { SUPPORTED_LANGUAGES } from "./lang.js";
 
-const NEW_SENTENCE_CHARS = [".", "?", "!", ","];
+const NEW_SENTENCE_CHARS = [".", "?", "!"];
 const REMOVE_SPACE_CHARS = [".", "?", "!", ",", ":", "—", "–", "-", "’"];
 const NO_SPACE_AFTER_CHARS = ["—", "–", "-"];
 const SPACE_CHARS = ["\xA0", " "];
@@ -44,7 +44,6 @@ const MIN_WORD_LENGHT_TO_PREDICT = 1;
       );
       this.whiteSpaceRegEx = RegExp(/\s+/);
       this.letterRegEx = RegExp(/^\p{L}/, "u");
-      this.numberRegEx = RegExp(/^\d+$/);
       // Attach event listener
       window.addEventListener("message", this.messageHandler.bind(this));
       SUPPORTED_LANGUAGES.forEach((lang) => {
@@ -152,8 +151,7 @@ const MIN_WORD_LENGHT_TO_PREDICT = 1;
     }
 
     isNumber(str) {
-      const match = str.match(this.numberRegEx);
-      return Boolean(match);
+      return !isNaN(str) && !isNaN(parseFloat(str));
     }
 
     removePrevSentence(wordArray) {
@@ -199,9 +197,10 @@ const MIN_WORD_LENGHT_TO_PREDICT = 1;
           .splice(-PAST_WORDS_COUNT); // Get last 3 words
         const { wordArray, newSentence } =
           this.removePrevSentence(lastWordsArray);
-        predictionInput = wordArray.join(" ") + (endsWithSpace ? " " : "");
-        const lastWord = wordArray.length
-          ? wordArray[wordArray.length - 1]
+        const tokesArray = wordArray.join(" ").split(this.separatorCharRegEx);
+        predictionInput = tokesArray.join(" ") + (endsWithSpace ? " " : "");
+        const lastWord = tokesArray.length
+          ? tokesArray[tokesArray.length - 1]
           : "";
 
         // Check if autoCapitalize should be run
@@ -215,8 +214,8 @@ const MIN_WORD_LENGHT_TO_PREDICT = 1;
             doCapitalize = true;
           } else if (
             newSentence &&
-            ((!endsWithSpace && wordArray.length === 1) ||
-              (endsWithSpace && wordArray.length === 0))
+            ((!endsWithSpace && tokesArray.length === 1) ||
+              (endsWithSpace && tokesArray.length === 0))
           ) {
             doCapitalize = true;
           }
@@ -246,8 +245,54 @@ const MIN_WORD_LENGHT_TO_PREDICT = 1;
       return { predictionInput, doPrediction, doCapitalize };
     }
 
+    removeSpaceHandler(inputStr) {
+      if (
+        this.removeSpace &&
+        REMOVE_SPACE_CHARS.includes(inputStr[inputStr.length - 1]) &&
+        SPACE_CHARS.includes(inputStr[inputStr.length - 2]) &&
+        !SPACE_CHARS.includes(inputStr[inputStr.length - 3])
+      ) {
+        const txt =
+          inputStr[inputStr.length - 1] +
+          (this.insertSpaceAfterAutocomplete &&
+          !NO_SPACE_AFTER_CHARS.includes(inputStr[inputStr.length - 1])
+            ? inputStr[inputStr.length - 2]
+            : "");
+        return {
+          text: txt,
+          length: 2,
+        };
+      }
+      return null;
+    }
+
+    doPredictionHandler(predictionInput, lang) {
+      if (predictionInput === this.lastPrediction[lang].pastStream) {
+        return this.lastPrediction[lang].predictions;
+      }
+
+      // Do prediction
+      this.libPresageCallback[lang].pastStream = predictionInput;
+      const predictions = [];
+      const predictionsNative = this.libPresage[lang].predictWithProbability();
+      for (let i = 0; i < predictionsNative.size(); i++) {
+        const result = predictionsNative.get(i);
+        predictions.push(result.prediction);
+        //result.probability
+      }
+      this.lastPrediction[lang].pastStream = predictionInput;
+      this.lastPrediction[lang].predictions = predictions;
+
+      return predictions;
+    }
+
     runPrediction(event) {
-      const context = event.data.context;
+      const context = {
+        ...event.data.context,
+        predictions: [],
+        forceReplace: null,
+        triggerInputEvent: this.insertSpaceAfterAutocomplete,
+      };
       const { predictionInput, doPrediction, doCapitalize } = this.processInput(
         event.data.context.text
       );
@@ -255,65 +300,26 @@ const MIN_WORD_LENGHT_TO_PREDICT = 1;
         command: "sandBoxPredictResp",
         context: context,
       };
-      message.context.predictions = [];
-      message.context.forceReplace = null;
-      message.context.triggerInputEvent = this.insertSpaceAfterAutocomplete;
+
       if (!this.libPresage[context.lang]) {
         // Do nothing reply with empty predictions
+      } else if (!doPrediction && event.data.context.text.length) {
+        message.context.forceReplace = this.removeSpaceHandler(
+          event.data.context.text
+        );
       } else if (
-        !doPrediction &&
-        this.removeSpace &&
-        event.data.context.text.length
-      ) {
-        if (
-          REMOVE_SPACE_CHARS.includes(
-            event.data.context.text[event.data.context.text.length - 1]
-          ) &&
-          SPACE_CHARS.includes(
-            event.data.context.text[event.data.context.text.length - 2]
-          ) &&
-          !SPACE_CHARS.includes(
-            event.data.context.text[event.data.context.text.length - 3]
-          )
-        ) {
-          const txt =
-            event.data.context.text[event.data.context.text.length - 1] +
-            (this.insertSpaceAfterAutocomplete &&
-            !NO_SPACE_AFTER_CHARS.includes(
-              event.data.context.text[event.data.context.text.length - 1]
-            )
-              ? event.data.context.text[event.data.context.text.length - 2]
-              : "");
-          message.context.forceReplace = {
-            text: txt,
-            length: 2,
-          };
-        }
-      } else if (
-        // Do prediction - return cached version
-        doPrediction &&
-        predictionInput === this.lastPrediction[context.lang].pastStream
-      ) {
-        message.context.predictions =
-          this.lastPrediction[context.lang].predictions;
-      } else if (doPrediction) {
         // Do prediction
-        message.context.predictions = [];
-        this.libPresageCallback[context.lang].pastStream = predictionInput;
-        const predictionsNative =
-          this.libPresage[context.lang].predictWithProbability();
-        for (let i = 0; i < predictionsNative.size(); i++) {
-          const result = predictionsNative.get(i);
-          message.context.predictions.push(result.prediction);
-          //result.probability
-        }
-        this.lastPrediction[context.lang].pastStream = predictionInput;
-        this.lastPrediction[context.lang].predictions =
-          message.context.predictions;
+        doPrediction
+      ) {
+        message.context.predictions = this.doPredictionHandler(
+          predictionInput,
+          context.lang
+        );
       }
       // Add space if needed
       if (this.insertSpaceAfterAutocomplete) {
-        if (!context.nextChar.match(this.separatorCharRegEx)) {
+        // TODO: this might result in double space in some cases or a missing space.
+        if (!REMOVE_SPACE_CHARS.includes(context.nextChar)) {
           message.context.predictions = message.context.predictions.map(
             (pred) => `${pred}\xA0`
           );

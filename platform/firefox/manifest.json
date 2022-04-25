@@ -60,10 +60,9 @@
     "storage",
     "activeTab",
     "tabs",
-    "webNavigation",
     "<all_urls>"
   ],
-  "version": "2022.3.19.4",
+  "version": "2022.3.31",
   "manifest_version": 2,
   "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'",
   "commands": {
