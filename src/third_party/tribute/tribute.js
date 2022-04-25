@@ -83,6 +83,11 @@
         return;
       }
 
+      if (TributeEvents.ignored().includes(event.data)) {
+        // Ignored Character
+        return;
+      }
+
       instance.keyup.call(this, instance, event);
     }
 
@@ -113,10 +118,6 @@
       if (event instanceof KeyboardEvent) {
         if (event.key && event.key.length > 1) {
           // Not a Character exit early
-          return;
-        }
-        if (TributeEvents.ignored().includes(event.key)) {
-          // Ignored Character
           return;
         }
 

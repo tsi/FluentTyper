@@ -40,7 +40,7 @@
         "ArrowUp",
         "ArrowDown",
         "Enter",
-        "Space",
+        // "Space",
         "Backspace",
       ];
 
