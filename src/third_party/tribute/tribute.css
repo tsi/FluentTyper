@@ -6,28 +6,29 @@
   height: auto !important;
   overflow: hidden !important;
   z-index: 2147483647 !important;
-  box-shadow: 1px 2px 6px !important;
-  background-color: #f8f8f8 !important;
-  color: #303030 !important;
+  border: 1px solid #adadad;
+  color: #525252 !important;
+  background-color: #fdfdfd !important;
+  font-family: monospace !important;
 }
 .tribute-container ul {
   margin: 0 !important;
   padding: 0 !important;
   list-style: none !important;
-  background-color:#f8f8f8 !important;
 }
 .tribute-container li {
   margin: 0 !important;
   padding: 3px 5px !important;
   cursor: pointer !important;
+  min-width: 200px !important;
 }
 .tribute-container li.highlight {
-  background-color: #303030 !important;
-  color: #f8f8f8 !important;
+  color: #121212 !important;
+  background-color: #eaeaea !important;
 }
 .tribute-container li.highlight:hover {
-  background-color: #303030 !important;
-  color: #f8f8f8 !important;
+  color: #121212 !important;
+  background-color: #eaeaea !important;
 }
 .tribute-container li span {
   font-weight: bold !important;
