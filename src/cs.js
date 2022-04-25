@@ -6,7 +6,8 @@
 
   class FluentTyper {
     constructor() {
-      this.SELECTORS = "textarea, input, [contentEditable]";
+      // this.SELECTORS = "textarea, input, [contentEditable]";
+      this.SELECTORS = "textarea, [contentEditable]";
       this.newTributeId = 0;
       this.tributeArr = {};
       this.pendingReq = null;
