@@ -19,6 +19,10 @@
       return ["CapsLock", "Control", "Fn", "Hyper", "Meta", "OS", "Super", "Symbol", "Win"];
     }
 
+    static ignored() {
+      return ["@", "."];
+    }
+
     bind(element) {
       const KEY_EVENT_TIMEOUT_MS = 32;
       element.boundKeyDown = this.tribute.debounce(this.keydown.bind(element, this), KEY_EVENT_TIMEOUT_MS);
@@ -95,6 +99,10 @@
       if (event instanceof KeyboardEvent) {
         if (event.key && event.key.length > 1) {
           // Not a Character exit early
+          return;
+        }
+        if (TributeEvents.ignored().includes(event.key)) {
+          // Ignored Character
           return;
         }
 
