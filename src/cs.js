@@ -40,8 +40,8 @@
         "ArrowUp",
         "ArrowDown",
         "Enter",
-        // "Space",
-        "Backspace",
+        "Space",
+        // "Backspace",
       ];
 
       return keyArr;

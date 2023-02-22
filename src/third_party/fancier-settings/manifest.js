@@ -108,7 +108,7 @@ const manifest = {
       name: "autocomplete",
       type: "checkbox",
       label:
-        "Auto-completes word on 'space' (Returns to original text on 'backspace').",
+        "Auto-completes word on 'space'.",
       default: true,
     },
     {

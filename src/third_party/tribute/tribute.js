@@ -20,7 +20,7 @@
     }
 
     static ignored() {
-      return ["@", "."];
+      return ["@", ".", ":", "?"];
     }
 
     bind(element) {
@@ -84,7 +84,6 @@
       }
 
       if (TributeEvents.ignored().includes(event.data)) {
-        // Ignored Character
         return;
       }
 
